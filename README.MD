@@ -1,0 +1,1 @@
+A little data processing tool for usb cmos detector based spectrometer/photospectrometers that runs in a browser. 
