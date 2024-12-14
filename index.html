@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Local Spectrometer</title>
+    <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+    <h1>Spectrometer Data Acquisition</h1>
+    <div class="camera-controls">
+        <select id="cameraSelect"></select>
+        <button id="pauseButton">Pause</button>
+        <button id="captureFrame">Capture Frame</button>
+        <div id="cameraStatus"></div>
+    </div>
+    <div id="cameraInfo"></div>
+    <div class="video-container">
+        <video id="video" width="960" height="540" autoplay></video>
+        <canvas id="overlay" width="960" height="540"></canvas>
+    </div>
+    <div class="recording-controls">
+        <div class="recording-options">
+            <label>
+                <input type="checkbox" id="recordRawVideo" checked>
+                Record Raw Video
+            </label>
+            <label>
+                <input type="number" id="recordInterval" value="1" min="0.1" max="10" step="0.1">
+                Recording Interval (seconds)
+            </label>
+        </div>
+        <button id="startRecording" class="record-button">Start Recording</button>
+        <span id="recordingStatus" class="recording-status"></span>
+    </div>
+     <div class="controls">
+        <label for="startX">Start X (0-1920):</label>
+        <input type="number" id="startX" value="0" min="0" max="1920">
+        <label for="stopX">Stop X (0-1920):</label>
+        <input type="number" id="stopX" value="1920" min="0" max="1920">
+        <label for="startY">Start Y (0-1080):</label>
+        <input type="number" id="startY" value="540" min="0" max="1080">
+        <label for="stopY">Stop Y (0-1080):</label>
+        <input type="number" id="stopY" value="590" min="0" max="1080">
+    </div>
+
+    <div class="upload-controls">
+        <div class="file-input-wrapper">
+            <input type="file" id="imageUpload" accept="image/*">
+            <label for="imageUpload" class="file-label">Choose File</label>
+        </div>
+        <button id="processImage">Process Image</button>
+        <button id="returnToLive">Return to Live View</button>
+    </div>
+
+    <div class="spectragraph-container">
+        <div class="range-controls">
+            <div class="range-input">
+                <label>Display Range:</label>
+                <input type="number" id="rangeStart" value="350" min="200" max="2000" placeholder="Start nm">
+                <span>-</span>
+                <input type="number" id="rangeEnd" value="1200" min="200" max="2000" placeholder="End nm">
+                <button id="updateRange">Update Range</button>
+            </div>
+            <div class="range-input">
+                <label>
+                    <input type="checkbox" id="reverseSpectrum">
+                    Reverse Spectrum
+                </label>
+            </div>
+            <div class="range-input">
+                <label>QE Profile:</label>
+                <select id="qeProfile">
+                    <option value="none">No QE Correction</option>
+                    <option value="generated">Generated Profile</option>
+                </select>
+            </div>
+        </div>
+        <div class="export-controls">
+            <button id="exportCSV">Export to CSV</button>
+        </div>
+        <canvas id="spectragraph" width="960" height="300"></canvas>
+        <div class="calibration-controls">
+            <div class="calibration-point">
+                <label>Point 1:</label>
+                <input type="number" id="cal1X" value="1623" placeholder="X Position">
+                <input type="number" id="cal1Wave" value="405.4" placeholder="Wavelength (nm)">
+            </div>
+            <div class="calibration-point">
+                <label>Point 2:</label>
+                <input type="number" id="cal2X" value="1238" placeholder="X Position">
+                <input type="number" id="cal2Wave" value="611.6" placeholder="Wavelength (nm)">
+            </div>
+            <div class="calibration-point">
+                <label>
+                    <input type="checkbox" id="showCalibrationLines" checked>
+                    Show Calibration Lines
+                </label>
+            </div>
+            <button id="calibrate">Apply Calibration</button>
+            <div id="sensorRange" class="sensor-range">Sensor Range: calculating...</div>
+        </div>
+    </div>
+
+    <div id="output"></div>
+
+    <!-- Load QE calibration first -->
+    <script src="qe_calibration.js"></script>
+    
+    <!-- Then load other scripts -->
+    <script src="js/imageProcessor.js" type="module"></script>
+    <script src="js/spectragraph.js" type="module"></script>
+    <script src="js/camera.js" type="module"></script>
+    <script src="js/main.js" type="module"></script>
+</body>
+</html> 
