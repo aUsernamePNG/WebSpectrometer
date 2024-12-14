@@ -85,9 +85,27 @@ class Spectragraph {
         this.zoomFactor = 1.1;
         this.rawData = new Array(960).fill(0);
         
+        // Bind event handlers
+        this.handleMouseMove = this.handleMouseMove.bind(this);
+        this.handleMouseLeave = this.handleMouseLeave.bind(this);
+        this.handleWheel = this.handleWheel.bind(this);
+        
+        // Add event listeners
+        this.canvas.addEventListener('mousemove', this.handleMouseMove);
+        this.canvas.addEventListener('mouseleave', this.handleMouseLeave);
+        this.canvas.addEventListener('wheel', this.handleWheel);
+        
         // Set canvas size
         this.resizeCanvas();
         window.addEventListener('resize', () => this.resizeCanvas());
+
+        // Calculate and display initial sensor range
+        const range = this.calculateSensorRange();
+        const sensorRangeElement = document.getElementById('sensorRange');
+        if (sensorRangeElement) {
+            sensorRangeElement.textContent = 
+                `Sensor Range: ${range.start}nm - ${range.end}nm`;
+        }
     }
 
     setShowCalibrationLines(show) {
@@ -107,34 +125,41 @@ class Spectragraph {
         // Calculate and display sensor range
         const range = this.calculateSensorRange();
         const sensorRangeElement = document.getElementById('sensorRange');
-        sensorRangeElement.textContent = 
-            `Sensor Range: ${range.start}nm - ${range.end}nm`;
+        if (sensorRangeElement) {
+            sensorRangeElement.textContent = 
+                `Sensor Range: ${range.start}nm - ${range.end}nm`;
+        }
     }
 
     updateDisplayRange(start, end) {
-        // Ensure start is less than end
-        if (start >= end) {
-            console.warn('Invalid range: start must be less than end');
-            return;
-        }
+        // Parse inputs to ensure we're working with numbers
+        start = parseFloat(start);
+        end = parseFloat(end);
 
+        // Get sensor range
         const sensorRange = this.calculateSensorRange();
         
         // Clamp values to sensor range
-        const newStart = Math.max(sensorRange.start, Math.min(start, sensorRange.end));
-        const newEnd = Math.min(sensorRange.end, Math.max(end, sensorRange.start));
+        const newStart = Math.max(sensorRange.start, Math.min(start, sensorRange.end - 50));
+        const newEnd = Math.min(sensorRange.end, Math.max(end, sensorRange.start + 50));
         
-        // Ensure minimum range of 100nm
-        if (newEnd - newStart < 100) {
-            console.warn('Range must be at least 100nm');
-            return;
-        }
-        
-        if (newStart < newEnd) {
-            this.displayRange.start = newStart;
-            this.displayRange.end = newEnd;
+        // Always update the range as long as it's at least 50nm
+        if (newEnd - newStart >= 50) {
+            // Update the display range
+            this.displayRange = {
+                start: newStart,
+                end: newEnd
+            };
+            
+            // Update input fields with clamped values
             this.updateDisplayRangeInputs();
+            
+            // Force a redraw
             this.draw();
+            
+            console.log(`Range updated and redrawn: ${newStart}nm - ${newEnd}nm (Sensor range: ${sensorRange.start}nm - ${sensorRange.end}nm)`);
+        } else {
+            console.log(`Invalid range: ${newStart}nm - ${newEnd}nm (must be at least 50nm)`);
         }
     }
 
@@ -213,6 +238,8 @@ class Spectragraph {
         if (this.showCalibrationLines) {
             this.drawCalibrationLines();
         }
+        
+        // Draw hover info if mouse position exists and is within graph area
         if (this.mousePosition && this.mousePosition.y < height) {
             this.drawHoverInfo(this.mousePosition.x, this.mousePosition.y);
         }
@@ -531,49 +558,33 @@ class Spectragraph {
     }
 
     handleZoom(mouseX, deltaY) {
-        const width = this.canvas.width;
+        const sensorRange = this.calculateSensorRange();
+        const zoomIn = deltaY < 0;
         
-        // Convert mouse position to wavelength
-        const wavelengthAtCursor = this.isReversed ? 
-            this.displayRange.end - (mouseX / width) * (this.displayRange.end - this.displayRange.start) :
-            this.displayRange.start + (mouseX / width) * (this.displayRange.end - this.displayRange.start);
+        // Calculate the wavelength at mouse position
+        const mouseWavelength = this.xToWavelength(mouseX);
         
-        // Calculate current range
+        // Calculate new range based on zoom factor
         const currentRange = this.displayRange.end - this.displayRange.start;
+        const newRange = zoomIn ? currentRange / this.zoomFactor : currentRange * this.zoomFactor;
         
-        // Calculate new range based on zoom direction
-        const newRange = deltaY > 0 ? 
-            currentRange * this.zoomFactor : // Zoom out
-            currentRange / this.zoomFactor;  // Zoom in
+        // Calculate how much the range changes
+        const rangeDelta = newRange - currentRange;
         
-        // Set minimum and maximum zoom ranges
-        const minRange = 100;   // Minimum 100nm range
-        const maxRange = 2000; // Maximum 2000nm range
+        // Calculate new start and end, keeping mouse position fixed
+        const mouseRatio = (mouseWavelength - this.displayRange.start) / currentRange;
+        let newStart = mouseWavelength - (mouseRatio * newRange);
+        let newEnd = newStart + newRange;
         
-        if (newRange >= minRange && newRange <= maxRange) {
-            // Calculate the percentage position of the cursor
-            const cursorPercent = (wavelengthAtCursor - this.displayRange.start) / currentRange;
-            
-            // Calculate new start and end keeping cursor position stable
-            let newStart = wavelengthAtCursor - (newRange * cursorPercent);
-            let newEnd = newStart + newRange;
-            
-            // Enforce absolute limits
-            if (newStart < 200) {
-                newStart = 200;
-                newEnd = newStart + newRange;
-            }
-            if (newEnd > 2000) {
-                newEnd = 2000;
-                newStart = newEnd - newRange;
-            }
-            
+        // Clamp values to sensor range
+        newStart = Math.max(sensorRange.start, Math.min(newStart, sensorRange.end - 50));
+        newEnd = Math.min(sensorRange.end, Math.max(newEnd, sensorRange.start + 50));
+        
+        // Ensure minimum range of 50nm is maintained
+        if (newEnd - newStart >= 50) {
             this.displayRange.start = newStart;
             this.displayRange.end = newEnd;
-            
-            // Update the input fields
             this.updateDisplayRangeInputs();
-            
             this.draw();
         }
     }
@@ -582,8 +593,10 @@ class Spectragraph {
         const startInput = document.getElementById('rangeStart');
         const endInput = document.getElementById('rangeEnd');
         
-        startInput.value = Math.round(this.displayRange.start);
-        endInput.value = Math.round(this.displayRange.end);
+        if (startInput && endInput) {
+            startInput.value = Math.round(this.displayRange.start);
+            endInput.value = Math.round(this.displayRange.end);
+        }
     }
 
     calculateSensorRange() {
@@ -593,13 +606,18 @@ class Spectragraph {
         const wavelengthPerPixel = (point2.wavelength - point1.wavelength) / 
                                  (point2.x - point1.x);
         
-        // Calculate wavelength at x=0 and x=1920
+        // Calculate wavelength at x=0 and x=1920 (full sensor width)
         const startWavelength = point1.wavelength - (point1.x * wavelengthPerPixel);
         const endWavelength = startWavelength + (1920 * wavelengthPerPixel);
         
+        // Ensure start is always less than end
+        const start = Math.min(startWavelength, endWavelength);
+        const end = Math.max(startWavelength, endWavelength);
+        
+        // Round to 1 decimal place for display
         return {
-            start: Math.round(startWavelength * 100) / 100,
-            end: Math.round(endWavelength * 100) / 100
+            start: Math.round(start * 10) / 10,
+            end: Math.round(end * 10) / 10
         };
     }
 
@@ -655,26 +673,49 @@ class Spectragraph {
     createSpectrumGradient(gradient) {
         const totalRange = this.displayRange.end - this.displayRange.start;
         
-        // Add UV region (gray)
-        gradient.addColorStop(0, '#808080');
-        const visibleStartPos = (this.visibleRange.start - this.displayRange.start) / totalRange;
-        gradient.addColorStop(Math.max(0, visibleStartPos), '#808080');
-
-        // Add visible spectrum
-        if (visibleStartPos < 1 && (this.visibleRange.end - this.displayRange.start) / totalRange > 0) {
-            gradient.addColorStop(Math.max(0, visibleStartPos), 'violet');
-            gradient.addColorStop(Math.min(1, (450 - this.displayRange.start) / totalRange), 'blue');
-            gradient.addColorStop(Math.min(1, (500 - this.displayRange.start) / totalRange), 'cyan');
-            gradient.addColorStop(Math.min(1, (550 - this.displayRange.start) / totalRange), 'green');
-            gradient.addColorStop(Math.min(1, (600 - this.displayRange.start) / totalRange), 'yellow');
-            gradient.addColorStop(Math.min(1, (650 - this.displayRange.start) / totalRange), 'orange');
-            gradient.addColorStop(Math.min(1, (this.visibleRange.end - this.displayRange.start) / totalRange), 'red');
+        // Calculate normalized positions for visible spectrum
+        const visibleStartPos = Math.max(0, Math.min(1, (this.visibleRange.start - this.displayRange.start) / totalRange));
+        const visibleEndPos = Math.max(0, Math.min(1, (this.visibleRange.end - this.displayRange.start) / totalRange));
+        
+        // If we're completely in IR or UV region, just use gray
+        if (this.displayRange.start >= this.visibleRange.end || this.displayRange.end <= this.visibleRange.start) {
+            gradient.addColorStop(0, '#808080');
+            gradient.addColorStop(1, '#808080');
+            return;
         }
-
-        // Add IR region (gray)
-        const visibleEndPos = (this.visibleRange.end - this.displayRange.start) / totalRange;
-        gradient.addColorStop(Math.min(1, visibleEndPos), '#808080');
-        gradient.addColorStop(1, '#808080');
+        
+        // Add UV region if applicable
+        if (this.displayRange.start < this.visibleRange.start) {
+            gradient.addColorStop(0, '#808080');
+            gradient.addColorStop(visibleStartPos, '#808080');
+        }
+        
+        // Add visible spectrum colors
+        if (visibleStartPos < 1 && visibleEndPos > 0) {
+            // Calculate normalized positions for each color
+            const colors = [
+                { wavelength: 380, color: 'violet' },
+                { wavelength: 450, color: 'blue' },
+                { wavelength: 500, color: 'cyan' },
+                { wavelength: 550, color: 'green' },
+                { wavelength: 600, color: 'yellow' },
+                { wavelength: 650, color: 'orange' },
+                { wavelength: 700, color: 'red' }
+            ];
+            
+            colors.forEach(({ wavelength, color }) => {
+                const pos = Math.max(0, Math.min(1, (wavelength - this.displayRange.start) / totalRange));
+                if (pos >= 0 && pos <= 1) {
+                    gradient.addColorStop(pos, color);
+                }
+            });
+        }
+        
+        // Add IR region if applicable
+        if (this.displayRange.end > this.visibleRange.end) {
+            gradient.addColorStop(Math.min(1, visibleEndPos), '#808080');
+            gradient.addColorStop(1, '#808080');
+        }
     }
 
     // Add this method to the Spectragraph class
@@ -693,6 +734,28 @@ class Spectragraph {
             corrected: Array.from({ length }, (_, i) => this.data[i] || 0),
             length: length
         };
+    }
+
+    // Add these event handler methods
+    handleMouseMove(event) {
+        const rect = this.canvas.getBoundingClientRect();
+        this.mousePosition = {
+            x: event.clientX - rect.left,
+            y: event.clientY - rect.top
+        };
+        this.draw();
+    }
+
+    handleMouseLeave() {
+        this.mousePosition = null;
+        this.draw();
+    }
+
+    handleWheel(event) {
+        event.preventDefault();
+        const rect = this.canvas.getBoundingClientRect();
+        const mouseX = event.clientX - rect.left;
+        this.handleZoom(mouseX, event.deltaY);
     }
 }
 

@@ -41,9 +41,31 @@ class RecordingManager {
             if (this.recordRawVideo.checked) {
                 try {
                     const stream = cameraManager.stream;
-                    this.mediaRecorder = new MediaRecorder(stream, {
-                        mimeType: 'video/webm;codecs=vp9'
-                    });
+                    
+                    // Try to use H.264 codec with MP4 container
+                    let options = {
+                        mimeType: 'video/mp4;codecs=avc1.42E01E', // H.264 baseline profile
+                        videoBitsPerSecond: 2500000 // 2.5 Mbps
+                    };
+
+                    // If H.264 is not supported, try alternative formats
+                    if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+                        const formats = [
+                            'video/mp4',
+                            'video/webm;codecs=h264',
+                            'video/webm'
+                        ];
+                        
+                        for (const format of formats) {
+                            if (MediaRecorder.isTypeSupported(format)) {
+                                options.mimeType = format;
+                                break;
+                            }
+                        }
+                    }
+
+                    this.mediaRecorder = new MediaRecorder(stream, options);
+                    console.log(`Recording with format: ${options.mimeType}`);
 
                     this.mediaRecorder.ondataavailable = (event) => {
                         if (event.data.size > 0) {
@@ -152,38 +174,40 @@ class RecordingManager {
         // Save video if recorded
         let videoUrl = null;
         if (this.recordedChunks.length > 0) {
-            const videoBlob = new Blob(this.recordedChunks, { type: 'video/webm' });
+            // Determine video format from the MIME type
+            const videoFormat = this.mediaRecorder.mimeType.includes('mp4') ? 'mp4' : 'webm';
+            const videoBlob = new Blob(this.recordedChunks, { 
+                type: this.mediaRecorder.mimeType 
+            });
             videoUrl = URL.createObjectURL(videoBlob);
-        }
 
-        // Create download dialog
-        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-        const dialog = document.createElement('div');
-        dialog.className = 'download-dialog';
-        dialog.innerHTML = `
-            <h3>Recording Complete</h3>
-            <p>Download recorded files:</p>
-            <div class="download-buttons">
-                <a href="${csvUrl}" download="spectral_data_${timestamp}.csv" class="download-button">
-                    Download CSV Data
-                </a>
-                ${videoUrl ? `
-                    <a href="${videoUrl}" download="raw_video_${timestamp}.webm" class="download-button">
-                        Download Video
+            // Create download dialog
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+            const dialog = document.createElement('div');
+            dialog.className = 'download-dialog';
+            dialog.innerHTML = `
+                <h3>Recording Complete</h3>
+                <p>Download recorded files:</p>
+                <div class="download-buttons">
+                    <a href="${csvUrl}" download="spectral_data_${timestamp}.csv" class="download-button">
+                        Download CSV Data
                     </a>
-                ` : ''}
-            </div>
-            <button class="close-button">Close</button>
-        `;
+                    <a href="${videoUrl}" download="raw_video_${timestamp}.${videoFormat}" class="download-button">
+                        Download Video (${videoFormat.toUpperCase()})
+                    </a>
+                </div>
+                <button class="close-button">Close</button>
+            `;
 
-        document.body.appendChild(dialog);
+            document.body.appendChild(dialog);
 
-        // Handle dialog close
-        dialog.querySelector('.close-button').onclick = () => {
-            document.body.removeChild(dialog);
-            URL.revokeObjectURL(csvUrl);
-            if (videoUrl) URL.revokeObjectURL(videoUrl);
-        };
+            // Handle dialog close
+            dialog.querySelector('.close-button').onclick = () => {
+                document.body.removeChild(dialog);
+                URL.revokeObjectURL(csvUrl);
+                URL.revokeObjectURL(videoUrl);
+            };
+        }
     }
 
     generateCSV() {

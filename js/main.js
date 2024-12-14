@@ -134,14 +134,23 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Setup range update handler
     document.getElementById('updateRange').addEventListener('click', () => {
-        const start = parseInt(document.getElementById('rangeStart').value);
-        const end = parseInt(document.getElementById('rangeEnd').value);
+        const start = parseFloat(document.getElementById('rangeStart').value);
+        const end = parseFloat(document.getElementById('rangeEnd').value);
         
-        if (start < end) {
+        if (!isNaN(start) && !isNaN(end)) {
+            console.log(`Updating range to: ${start} - ${end}`);
             spectragraph.updateDisplayRange(start, end);
-        } else {
-            alert('Start wavelength must be less than end wavelength');
         }
+    });
+
+    // Add input validation for range inputs
+    ['rangeStart', 'rangeEnd'].forEach(id => {
+        document.getElementById(id).addEventListener('input', (e) => {
+            const value = parseFloat(e.target.value);
+            if (isNaN(value)) {
+                e.target.value = e.target.value.replace(/[^\d.-]/g, '');
+            }
+        });
     });
 
     function updateRegion() {
