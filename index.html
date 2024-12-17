@@ -12,6 +12,7 @@
         <select id="cameraSelect"></select>
         <button id="pauseButton">Pause</button>
         <button id="captureFrame">Capture Frame</button>
+        <button id="downloadFrame">Download Frame</button>
         <div id="cameraStatus"></div>
     </div>
     <div id="cameraInfo"></div>
@@ -104,10 +105,8 @@
 
     <div id="output"></div>
 
-    <!-- Load QE calibration first -->
-    <script src="qe_calibration.js"></script>
-    
-    <!-- Then load other scripts -->
+    <!-- Load all scripts as modules -->
+    <script src="js/qe_calibration.js" type="module"></script>
     <script src="js/imageProcessor.js" type="module"></script>
     <script src="js/spectragraph.js" type="module"></script>
     <script src="js/camera.js" type="module"></script>

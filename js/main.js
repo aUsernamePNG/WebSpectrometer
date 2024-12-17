@@ -3,79 +3,81 @@ import imageProcessor from './imageProcessor.js';
 import { spectragraph } from './spectragraph.js';
 import { recordingManager } from './recordingManager.js';
 
-// Setup animation loop for video processing
-function processVideoFrame() {
-    if (!cameraManager.isPaused) {
-        imageProcessor.processVideoFrame(cameraManager.video);
-    }
-    requestAnimationFrame(processVideoFrame);
-}
-
-// Start the animation loop
-processVideoFrame();
-
-// Setup pause button
-const pauseButton = document.getElementById('pauseButton');
-pauseButton.addEventListener('click', () => {
-    const isPaused = !cameraManager.isPaused;
-    cameraManager.setPaused(isPaused);
-    pauseButton.textContent = isPaused ? 'Resume' : 'Pause';
-});
-
-// Setup capture button
-const captureButton = document.getElementById('captureFrame');
-captureButton.addEventListener('click', () => {
-    cameraManager.setPaused(true);
-    pauseButton.textContent = 'Resume';
-});
-
-// Setup range update button
-const updateRangeButton = document.getElementById('updateRange');
-updateRangeButton.addEventListener('click', () => {
-    const start = parseFloat(document.getElementById('rangeStart').value);
-    const end = parseFloat(document.getElementById('rangeEnd').value);
-    spectragraph.updateDisplayRange(start, end);
-});
-
-// Setup calibration button
-const calibrateButton = document.getElementById('calibrate');
-calibrateButton.addEventListener('click', () => {
-    const point1 = {
-        x: parseInt(document.getElementById('cal1X').value),
-        wavelength: parseFloat(document.getElementById('cal1Wave').value)
-    };
-    const point2 = {
-        x: parseInt(document.getElementById('cal2X').value),
-        wavelength: parseFloat(document.getElementById('cal2Wave').value)
-    };
-    spectragraph.updateCalibration(point1, point2);
-});
-
-// Setup export button
-document.getElementById('exportCSV').addEventListener('click', () => {
-    spectragraph.exportToCSV();
-});
-
-// Setup other UI controls
-document.getElementById('showCalibrationLines').addEventListener('change', (e) => {
-    spectragraph.setShowCalibrationLines(e.target.checked);
-});
-
-document.getElementById('reverseSpectrum').addEventListener('change', (e) => {
-    spectragraph.setReversed(e.target.checked);
-});
-
 document.addEventListener('DOMContentLoaded', () => {
-    const overlay = document.getElementById('overlay');
-    const spectragraphCanvas = document.getElementById('spectragraph');
-    const pauseButton = document.getElementById('pauseButton');
-    
-    const spectragraph = new Spectragraph(spectragraphCanvas);
-    const imageProcessor = new ImageProcessor(overlay);
+    // Initialize dependencies
     imageProcessor.setSpectragraph(spectragraph);
 
-    const cameraManager = new CameraManager();
-    cameraManager.listCameras();
+    // Setup animation loop for video processing
+    function processVideoFrame() {
+        if (!cameraManager.isPaused) {
+            imageProcessor.processVideoFrame(cameraManager.video);
+        }
+        requestAnimationFrame(processVideoFrame);
+    }
+
+    // Start the animation loop
+    processVideoFrame();
+
+    // Setup download frame button
+    document.getElementById('downloadFrame').addEventListener('click', () => {
+        imageProcessor.downloadCurrentFrame();
+    });
+
+    // Setup export CSV button
+    document.getElementById('exportCSV').addEventListener('click', () => {
+        spectragraph.exportToCSV();
+    });
+
+    // Setup pause button
+    const pauseButton = document.getElementById('pauseButton');
+    pauseButton.addEventListener('click', () => {
+        const isPaused = !cameraManager.isPaused;
+        cameraManager.setPaused(isPaused);
+        pauseButton.textContent = isPaused ? 'Resume' : 'Pause';
+    });
+
+    // Setup capture button
+    const captureButton = document.getElementById('captureFrame');
+    captureButton.addEventListener('click', () => {
+        cameraManager.setPaused(true);
+        pauseButton.textContent = 'Resume';
+    });
+
+    // Setup range update button
+    const updateRangeButton = document.getElementById('updateRange');
+    updateRangeButton.addEventListener('click', () => {
+        const start = parseFloat(document.getElementById('rangeStart').value);
+        const end = parseFloat(document.getElementById('rangeEnd').value);
+        spectragraph.updateDisplayRange(start, end);
+    });
+
+    // Setup calibration button
+    const calibrateButton = document.getElementById('calibrate');
+    calibrateButton.addEventListener('click', () => {
+        const point1 = {
+            x: parseInt(document.getElementById('cal1X').value),
+            wavelength: parseFloat(document.getElementById('cal1Wave').value)
+        };
+        const point2 = {
+            x: parseInt(document.getElementById('cal2X').value),
+            wavelength: parseFloat(document.getElementById('cal2Wave').value)
+        };
+        spectragraph.updateCalibration(point1, point2);
+    });
+
+    // Setup other UI controls
+    document.getElementById('showCalibrationLines').addEventListener('change', (e) => {
+        spectragraph.setShowCalibrationLines(e.target.checked);
+    });
+
+    document.getElementById('reverseSpectrum').addEventListener('change', (e) => {
+        spectragraph.setReversed(e.target.checked);
+    });
+
+    // Setup camera selection change handler
+    document.getElementById('cameraSelect').addEventListener('change', (event) => {
+        cameraManager.startCamera(event.target.value);
+    });
 
     // Setup pause button handler
     let isPaused = false;
@@ -85,17 +87,6 @@ document.addEventListener('DOMContentLoaded', () => {
         pauseButton.classList.toggle('paused', isPaused);
         imageProcessor.setPaused(isPaused);
         cameraManager.setPaused(isPaused);
-    });
-
-    // Setup camera selection change handler
-    document.getElementById('cameraSelect').addEventListener('change', (event) => {
-        cameraManager.startCamera(event.target.value);
-    });
-
-    // Update overlay when any input changes
-    const inputs = ['startX', 'stopX', 'startY', 'stopY'];
-    inputs.forEach(id => {
-        document.getElementById(id).addEventListener('input', updateRegion);
     });
 
     // Setup calibration handler
@@ -192,23 +183,23 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // Update mouse move handler
-    spectragraphCanvas.addEventListener('mousemove', (event) => {
-        const rect = spectragraphCanvas.getBoundingClientRect();
+    spectragraph.addEventListener('mousemove', (event) => {
+        const rect = spectragraph.getBoundingClientRect();
         const x = event.clientX - rect.left;
         const y = event.clientY - rect.top;
         
         spectragraph.setMousePosition(x, y);
     });
 
-    spectragraphCanvas.addEventListener('mouseleave', () => {
+    spectragraph.addEventListener('mouseleave', () => {
         spectragraph.clearMousePosition();
     });
 
     // Add wheel event handler for zooming
-    spectragraphCanvas.addEventListener('wheel', (event) => {
+    spectragraph.addEventListener('wheel', (event) => {
         event.preventDefault(); // Prevent page scrolling
         
-        const rect = spectragraphCanvas.getBoundingClientRect();
+        const rect = spectragraph.getBoundingClientRect();
         const x = event.clientX - rect.left;
         
         spectragraph.handleZoom(x, event.deltaY);
@@ -257,5 +248,10 @@ document.addEventListener('DOMContentLoaded', () => {
     // Add with other event listeners
     document.getElementById('captureFrame').addEventListener('click', () => {
         imageProcessor.captureFrame();
+    });
+
+    // Setup download frame button
+    document.getElementById('downloadFrame').addEventListener('click', () => {
+        imageProcessor.downloadCurrentFrame();
     });
 }); 

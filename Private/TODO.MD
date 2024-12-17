@@ -96,4 +96,4 @@ The spectrometer application processes live video feed or static images to analy
 - Recording spectrometer data to CSV with aditional option to record raw video along with csv 
 -add backend with support for saving spectra csv data and frame data
 -add automatic calibration using reference spectra for a calibration source with inital support of an Argon spectrum tube
-
+-Build spectroradiometeric calibration tool what uses monochrometer with known intensites at each wavelenth to perfrom quantum efficentcy curve calcual;tion 
